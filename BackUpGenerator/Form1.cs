@@ -595,6 +595,7 @@ namespace BackUpGenerator
                     string.Join("|", selectedFiles.Select(f => MakeRelativePath(baseDir, f))));
 
                 ini.Write(section, "Name", txtName.Text);
+                ini.Write(section, "Path", txtPath.Text);
                 ini.Write(section, "Password", txtPassword.Text);
                 ini.Write(section, "ChkBackUp", chkBackUp.Checked.ToString());
                 ini.Write(section, "ChkPersianTime", chkPersianTime.Checked.ToString());
@@ -658,6 +659,7 @@ namespace BackUpGenerator
 
                 // Load other settings
                 txtName.Text = ini.Read(section, "Name");
+                txtPath.Text = ini.Read(section, "Path");
                 txtPassword.Text = ini.Read(section, "Password");
                 chkBackUp.Checked = bool.Parse(ini.Read(section, "ChkBackUp", "False"));
                 chkPersianTime.Checked = bool.Parse(ini.Read(section, "ChkPersianTime", "False"));
@@ -703,6 +705,7 @@ namespace BackUpGenerator
         private void btnCleanPage_Click(object sender, EventArgs e)
         {
             txtName.Clear();
+            txtPath.Clear();
             txtPassword.Clear();
             chkBackUp.Checked = false;
             chkPersianTime.Checked = false;
