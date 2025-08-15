@@ -15,6 +15,8 @@ namespace BackUpGenerator
     {
         public Form1()
         {
+            ini = new IniFile(iniPath);
+
             InitializeComponent();
         }
         private List<string> selectedFiles = new List<string>();
@@ -27,11 +29,7 @@ namespace BackUpGenerator
         {
             try
             {
-                if (!radRar.Checked && !radZip.Checked)
-                {
-                    MessageBox.Show("لطفا یک حالت برای خروجی انتخاب کنید", "خطا", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                    return;
-                }
+
                 if (chkAutomatic.Checked && numTime.Value == 0)
                 {
                     MessageBox.Show("لطفا مدت زمان بک آپ گیری اتوماتیک را مشخص کنید", "خطا", MessageBoxButtons.OK, MessageBoxIcon.Error);
@@ -69,21 +67,18 @@ namespace BackUpGenerator
                 if (chkBackUp.Checked)
                     fileName += "_BackUp";
 
-                if (chkTime.Checked)
+                if (chkPersianTime.Checked)
                     fileName += GetPersianDateTime();
+
+                if (chkEnglishTime.Checked)
+                    fileName += GetEnglishDateTime();
 
                 string outputPath = Path.Combine(txtPath.Text, fileName);
 
-                if (radZip.Checked)
-                {
-                    outputPath += ".zip";
-                    CreateZipArchive(outputPath, txtPassword.Text);
-                }
-                else if (radRar.Checked)
-                {
-                    outputPath += ".rar";
-                    CreateRarArchive(outputPath, txtPassword.Text);
-                }
+
+                outputPath += ".rar";
+                CreateRarArchive(outputPath, txtPassword.Text);
+
                 if (chkAutomatic.Checked)
                 {
                     Timer = (int)numTime.Value;
@@ -111,6 +106,12 @@ namespace BackUpGenerator
             PersianCalendar pc = new PersianCalendar();
             DateTime now = DateTime.Now;
             return $"{pc.GetYear(now)}{pc.GetMonth(now):00}{pc.GetDayOfMonth(now):00}" +
+                   $"{now.Hour:00}{now.Minute:00}{now.Second:00}";
+        }
+        private string GetEnglishDateTime()
+        {
+            DateTime now = DateTime.Now;
+            return $"{now.Year}{now.Month:00}{now.Day:00}" +
                    $"{now.Hour:00}{now.Minute:00}{now.Second:00}";
         }
 
@@ -225,72 +226,7 @@ namespace BackUpGenerator
                 return false;
             }
         }
-        private void CreateZipArchive(string outputPath, string password)
-        {
-            try
-            {
-                // پیدا کردن پوشه ریشه مشترک برای حفظ ساختار
-                string baseDir = FindCommonRootDirectory(selectedFiles);
 
-                using (var zip = new Ionic.Zip.ZipFile(Encoding.UTF8))
-                {
-                    // تنظیم رمز عبور اگر وجود دارد
-                    if (!string.IsNullOrWhiteSpace(password))
-                    {
-                        zip.Password = password;
-                        zip.Encryption = EncryptionAlgorithm.WinZipAes256;
-                        zip.Password = password; // تنظیم مجدد برای اطمینان
-                    }
-
-                    // اضافه کردن فایل‌ها با حفظ ساختار پوشه‌ها
-                    foreach (var path in selectedFiles)
-                    {
-                        try
-                        {
-                            if (Directory.Exists(path))
-                            {
-                                // اضافه کردن کل پوشه با ساختار داخلی
-                                string relativePath = MakeRelativePath(baseDir, path);
-                                zip.AddDirectory(path, relativePath);
-                            }
-                            else if (File.Exists(path))
-                            {
-                                // اضافه کردن فایل با مسیر نسبی
-                                string relativePath = MakeRelativePath(baseDir, Path.GetDirectoryName(path));
-                                zip.AddFile(path, relativePath);
-                            }
-                        }
-                        catch (PathTooLongException)
-                        {
-                            // استفاده از مسیرهای کوتاه شده اگر مسیر طولانی است
-                            string shortPath = GetShortPath(path);
-                            if (Directory.Exists(shortPath))
-                            {
-                                zip.AddDirectory(shortPath, Path.GetFileName(path));
-                            }
-                            else
-                            {
-                                zip.AddFile(shortPath, "");
-                            }
-                        }
-                    }
-
-                    // ذخیره فایل ZIP با مدیریت خطا
-                    try
-                    {
-                        zip.Save(outputPath);
-                    }
-                    catch (Exception ex)
-                    {
-                        throw new Exception($"خطا در ذخیره فایل ZIP: {ex.Message}");
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                throw new Exception($"خطا در ایجاد فایل ZIP: {ex.Message}");
-            }
-        }
 
 
 
@@ -312,67 +248,66 @@ namespace BackUpGenerator
                 string winRarPath = FindWinRarPath();
                 if (string.IsNullOrEmpty(winRarPath))
                 {
-                    throw new Exception("WinRAR در سیستم یافت نشد.");
+                    throw new Exception("WinRAR یافت نشد.");
                 }
 
-                string passwordArg = string.IsNullOrEmpty(password) ? "" : $"-p{password} -hp";
-                string baseDir = FindCommonRootDirectory(selectedFiles);
-
-                // تقسیم فایل‌ها به گروه‌های کوچک با حفظ ساختار
-                var fileBatches = SplitIntoBatches(selectedFiles, 10);
-
-                foreach (var batch in fileBatches)
+                if (File.Exists(outputPath))
                 {
-                    string tempList = null;
-                    try
+                    File.Delete(outputPath);
+                }
+
+                string baseDir = FindCommonRootDirectory(selectedFiles);
+                if (string.IsNullOrEmpty(baseDir))
+                {
+                    throw new Exception("مسیر مشترکی بین فایل‌ها یافت نشد.");
+                }
+
+                string tempListFile = Path.GetTempFileName();
+                try
+                {
+                    File.WriteAllLines(tempListFile, selectedFiles.Select(f => MakeRelativePath(baseDir, f)));
+
+                    string arguments = $"a -r -ep1 \"{outputPath}\" -w\"{baseDir}\" -@\"{tempListFile}\"";
+                    if (!string.IsNullOrEmpty(password))
                     {
-                        // ایجاد فایل لیست موقت
-                        tempList = Path.GetTempFileName();
-                        File.WriteAllLines(tempList, batch.Select(f => MakeRelativePath(baseDir, f)));
+                        arguments += $" -p{password} -hp";
+                    }
 
-                        // ساخت دستور RAR
-                        string arguments = $"a -r -ep1 {passwordArg} -w\"{baseDir}\" -@\"{tempList}\" \"{outputPath}\"";
+                    var processInfo = new ProcessStartInfo
+                    {
+                        FileName = winRarPath,
+                        Arguments = arguments,
+                        UseShellExecute = false,
+                        CreateNoWindow = true,
+                        RedirectStandardError = true,
+                        WorkingDirectory = baseDir
+                    };
 
-                        var processInfo = new ProcessStartInfo
+                    using (var process = Process.Start(processInfo))
+                    {
+                        string error = process.StandardError.ReadToEnd();
+                        if (!process.WaitForExit(30000))
                         {
-                            FileName = winRarPath,
-                            Arguments = arguments,
-                            UseShellExecute = false,
-                            CreateNoWindow = true,
-                            RedirectStandardError = true,
-                            WorkingDirectory = baseDir
-                        };
-
-                        using (var process = Process.Start(processInfo))
+                            process.Kill();
+                            throw new Exception("زمان ساخت فایل به پایان رسید.");
+                        }
+                        if (process.ExitCode != 0)
                         {
-                            string error = process.StandardError.ReadToEnd();
-                            process.WaitForExit();
-
-                            if (process.ExitCode != 0)
-                            {
-                                throw new Exception($"خطا در ایجاد فایل RAR: {error}");
-                            }
+                            throw new Exception($"خطای WinRAR: {error}");
                         }
                     }
-                    catch (Exception ex)
+                }
+                finally
+                {
+                    if (File.Exists(tempListFile))
                     {
-                        throw new Exception($"خطا در پردازش دسته فایل‌ها: {ex.Message}");
-                    }
-                    finally
-                    {
-                        // حذف فایل موقت در هر حال
-                        try
-                        {
-                            if (tempList != null && File.Exists(tempList))
-                                File.Delete(tempList);
-                        }
-                        catch { /* در صورت خطا در حذف، نادیده گرفته شود */ }
+                        File.Delete(tempListFile);
                     }
                 }
             }
             catch (Exception ex)
             {
-                throw new Exception($"خطا در ایجاد فایل RAR: {ex.Message}");
+                throw new Exception($"خطا در ساخت فایل RAR: {ex.Message}");
             }
         }
 
@@ -397,13 +332,33 @@ namespace BackUpGenerator
         // ساخت مسیر نسبی
         private string MakeRelativePath(string fromPath, string toPath)
         {
-            if (string.IsNullOrEmpty(fromPath)) return toPath;
+            try
+            {
+                if (string.IsNullOrEmpty(fromPath))
+                    return Path.GetFileName(toPath);
 
-            Uri fromUri = new Uri(fromPath.EndsWith("\\") ? fromPath : fromPath + "\\");
-            Uri toUri = new Uri(toPath);
+                // نرمال کردن مسیرها
+                fromPath = Path.GetFullPath(fromPath).TrimEnd('\\') + "\\";
+                toPath = Path.GetFullPath(toPath);
 
-            Uri relativeUri = fromUri.MakeRelativeUri(toUri);
-            return Uri.UnescapeDataString(relativeUri.ToString()).Replace('/', '\\');
+                // بررسی اینکه آیا مسیرها در یک درایو هستند
+                if (!string.Equals(Path.GetPathRoot(fromPath), Path.GetPathRoot(toPath), StringComparison.OrdinalIgnoreCase))
+                    return Path.GetFileName(toPath);
+
+                Uri fromUri = new Uri(fromPath);
+                Uri toUri = new Uri(toPath);
+
+                Uri relativeUri = fromUri.MakeRelativeUri(toUri);
+                string relativePath = Uri.UnescapeDataString(relativeUri.ToString())
+                    .Replace('/', Path.DirectorySeparatorChar);
+
+                return string.IsNullOrEmpty(relativePath) ? "." : relativePath;
+            }
+            catch
+            {
+                // اگر خطایی رخ داد، نام فایل را برگردان
+                return Path.GetFileName(toPath);
+            }
         }
 
         // تقسیم به دسته‌های کوچک
@@ -532,9 +487,6 @@ namespace BackUpGenerator
                         }
                     }
                 }
-
-                MessageBox.Show("پوشه‌های انتخابی با موفقیت پاکسازی شدند.",
-                    "موفقیت", MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
             catch (Exception ex)
             {
@@ -551,14 +503,253 @@ namespace BackUpGenerator
             {
                 try
                 {
+                    var accessTest = new DirectoryInfo(dir);
+                    if ((accessTest.Attributes & FileAttributes.ReadOnly) == FileAttributes.ReadOnly)
+                    {
+                        accessTest.Attributes &= ~FileAttributes.ReadOnly;
+                    }
+
                     Directory.Delete(dir, true); // حذف بازگشتی پوشه
                     Debug.WriteLine($"پوشه {dir} حذف شد.");
                 }
-                catch (Exception ex)
+                catch (UnauthorizedAccessException)
                 {
-                    Debug.WriteLine($"خطا در حذف {dir}: {ex.Message}");
+                    Debug.WriteLine($"عدم دسترسی به پوشه {dir}");
+                    continue;
                 }
             }
+        }
+
+        private void Form1_Load(object sender, EventArgs e)
+        {
+            LoadSavedBackupsToGrid();
+        }
+        private void LoadSavedBackupsToGrid()
+        {
+            dgvSave.Rows.Clear();
+
+            var sections = GetIniSections(iniPath);
+            foreach (var section in sections.Where(s => s.StartsWith("Backup_")))
+            {
+                string name = ini.Read(section, "Name", "");
+                string files = ini.Read(section, "SelectedFiles", "");
+                string date = ini.Read(section, "Date", "");
+
+                // اگر تاریخ قبلاً ذخیره نشده بود، مقدار پیش‌فرض بده
+                if (string.IsNullOrEmpty(date))
+                    date = "Unknown";
+
+                dgvSave.Rows.Add(section, name, files.Replace("|", ";"), date);
+            }
+        }
+        public class IniFile
+        {
+            private string path;
+            [DllImport("kernel32")]
+            private static extern long WritePrivateProfileString(string section,
+                string key, string val, string filePath);
+            [DllImport("kernel32")]
+            private static extern int GetPrivateProfileString(string section,
+                string key, string def, StringBuilder retVal,
+                int size, string filePath);
+
+            public IniFile(string iniPath)
+            {
+                path = iniPath;
+            }
+
+            public void Write(string section, string key, string value)
+            {
+                WritePrivateProfileString(section, key, value, path);
+            }
+
+            public string Read(string section, string key, string defaultVal = "")
+            {
+                StringBuilder temp = new StringBuilder(255);
+                GetPrivateProfileString(section, key, defaultVal, temp, 255, path);
+                return temp.ToString();
+            }
+
+            public void DeleteSection(string section)
+            {
+                WritePrivateProfileString(section, null, null, path);
+            }
+        }
+        private string iniPath = Path.Combine(Application.StartupPath, "LastSave.ini");
+        private IniFile ini;
+
+        private void btnSave_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                string section = "Backup_" + Guid.NewGuid().ToString();
+                string baseDir = FindCommonRootDirectory(selectedFiles);
+
+                // ذخیره مسیر پایه و مسیرهای نسبی
+                ini.Write(section, "BaseDirectory", baseDir);
+                ini.Write(section, "SelectedFiles",
+                    string.Join("|", selectedFiles.Select(f => MakeRelativePath(baseDir, f))));
+
+                ini.Write(section, "Name", txtName.Text);
+                ini.Write(section, "Password", txtPassword.Text);
+                ini.Write(section, "ChkBackUp", chkBackUp.Checked.ToString());
+                ini.Write(section, "ChkPersianTime", chkPersianTime.Checked.ToString());
+                ini.Write(section, "ChkEnglishTime", chkEnglishTime.Checked.ToString());
+                ini.Write(section, "ChkBin", chkBin.Checked.ToString());
+                ini.Write(section, "ChkObj", chkObj.Checked.ToString());
+                ini.Write(section, "ChkVs", chkVs.Checked.ToString());
+                ini.Write(section, "ChkAutomatic", chkAutomatic.Checked.ToString());
+                ini.Write(section, "NumTime", numTime.Value.ToString());
+                ini.Write(section, "ChkMessage", chkMessage.Checked.ToString());
+                ini.Write(section, "Date", DateTime.Now.ToString("yyyy/MM/dd HH:mm"));
+
+                dgvSave.Rows.Add(section, txtName.Text, string.Join(";", selectedFiles), DateTime.Now.ToString("yyyy/MM/dd HH:mm"));
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"خطا در ذخیره تنظیمات: {ex.Message}");
+            }
+        }
+
+
+
+        private void btnLoadSave_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                if (dgvSave.SelectedRows.Count == 0)
+                {
+                    MessageBox.Show("لطفاً یک مورد را انتخاب کنید.", "خطا", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+
+                string section = dgvSave.SelectedRows[0].Cells[0].Value.ToString();
+                string baseDir = ini.Read(section, "BaseDirectory");
+
+                selectedFiles.Clear();
+                string files = ini.Read(section, "SelectedFiles");
+                if (!string.IsNullOrEmpty(files))
+                {
+                    selectedFiles = files.Split('|')
+                        .Where(f => !string.IsNullOrEmpty(f))
+                        .Select(f => Path.Combine(baseDir, f)) // تبدیل مسیرهای نسبی به مطلق
+                        .ToList();
+                }
+
+                var invalidPaths = selectedFiles
+                    .Where(f => !File.Exists(f) && !Directory.Exists(f))
+                    .ToList();
+
+                if (invalidPaths.Any())
+                {
+                    MessageBox.Show($"مسیرهای نامعتبر:\n{string.Join("\n", invalidPaths.Take(3))}" +
+                                  (invalidPaths.Count > 3 ? "\n..." : ""),
+                                  "هشدار");
+                    selectedFiles = selectedFiles.Except(invalidPaths).ToList();
+                }
+
+                if (selectedFiles.Count == 0)
+                {
+                    MessageBox.Show("هیچ یک از مسیرهای ذخیره شده وجود ندارند");
+                    return;
+                }
+
+                // بارگذاری سایر تنظیمات
+                txtName.Text = ini.Read(section, "Name");
+                txtPassword.Text = ini.Read(section, "Password");
+                chkBackUp.Checked = bool.Parse(ini.Read(section, "ChkBackUp", "False"));
+                chkPersianTime.Checked = bool.Parse(ini.Read(section, "ChkPersianTime", "False"));
+                chkEnglishTime.Checked = bool.Parse(ini.Read(section, "ChkEnglishTime", "False"));
+                chkBin.Checked = bool.Parse(ini.Read(section, "ChkBin", "False"));
+                chkObj.Checked = bool.Parse(ini.Read(section, "ChkObj", "False"));
+                chkVs.Checked = bool.Parse(ini.Read(section, "ChkVs", "False"));
+                chkAutomatic.Checked = bool.Parse(ini.Read(section, "ChkAutomatic", "False"));
+                chkMessage.Checked = bool.Parse(ini.Read(section, "ChkMessage", "False"));
+
+                decimal val;
+                if (decimal.TryParse(ini.Read(section, "NumTime", "0"), out val))
+                    numTime.Value = val;
+
+                UpdateFilesList();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"خطا در بارگذاری تنظیمات: {ex.Message}");
+            }
+        }
+
+
+        private void btnDeleteLastSave_Click(object sender, EventArgs e)
+        {
+            if (dgvSave.SelectedRows.Count == 0)
+            {
+                MessageBox.Show("لطفاً یک مورد را انتخاب کنید.", "خطا", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            string section = dgvSave.SelectedRows[0].Cells[0].Value.ToString();
+
+            // حذف از ini
+            ini.DeleteSection(section);
+
+            // حذف از dgv
+            dgvSave.Rows.RemoveAt(dgvSave.SelectedRows[0].Index);
+
+            MessageBox.Show("ذخیره انتخاب‌شده حذف شد.", "موفقیت",
+                MessageBoxButtons.OK, MessageBoxIcon.Information);
+        }
+
+
+        private void btnCleanPage_Click(object sender, EventArgs e)
+        {
+            txtName.Clear();
+            txtPassword.Clear();
+            chkBackUp.Checked = false;
+            chkPersianTime.Checked = false;
+            chkEnglishTime.Checked = false;
+            chkBin.Checked = false;
+            chkObj.Checked = false;
+            chkVs.Checked = false;
+            chkAutomatic.Checked = false;
+            chkMessage.Checked = false;
+            numTime.Value = 0;
+
+            selectedFiles.Clear();
+            UpdateFilesList();
+        }
+        [DllImport("kernel32.dll", CharSet = CharSet.Auto)]
+        private static extern int GetPrivateProfileSectionNames(
+            IntPtr lpszReturnBuffer,
+            uint nSize,
+            string lpFileName);
+
+        private List<string> GetIniSections(string iniPath)
+        {
+            List<string> result = new List<string>();
+            IntPtr pReturnedString = Marshal.AllocCoTaskMem(32767);
+
+            try
+            {
+                uint bytesReturned = (uint)GetPrivateProfileSectionNames(pReturnedString, 32767, iniPath);
+                if (bytesReturned == 0) return result;
+
+                string local = Marshal.PtrToStringAuto(pReturnedString, (int)bytesReturned);
+                string[] sections = (local ?? string.Empty)
+                    .Split(new[] { '\0' }, StringSplitOptions.RemoveEmptyEntries);
+
+                result.AddRange(sections);
+            }
+            finally
+            {
+                Marshal.FreeCoTaskMem(pReturnedString);
+            }
+
+            return result;
+        }
+
+        private void groupBox2_Enter(object sender, EventArgs e)
+        {
+
         }
     }
 }
