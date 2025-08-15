@@ -47,6 +47,7 @@
             this.label2 = new System.Windows.Forms.Label();
             this.chkTime = new System.Windows.Forms.CheckBox();
             this.groupBox2 = new System.Windows.Forms.GroupBox();
+            this.chkObj = new System.Windows.Forms.CheckBox();
             this.chkAutomatic = new System.Windows.Forms.CheckBox();
             this.BackUpTimer = new System.Windows.Forms.Timer(this.components);
             this.grpAutomatic = new System.Windows.Forms.GroupBox();
@@ -56,7 +57,8 @@
             this.numTime = new System.Windows.Forms.NumericUpDown();
             this.lblTimer = new System.Windows.Forms.Label();
             this.label3 = new System.Windows.Forms.Label();
-            this.chkClean = new System.Windows.Forms.CheckBox();
+            this.chkBin = new System.Windows.Forms.CheckBox();
+            this.chkVs = new System.Windows.Forms.CheckBox();
             this.groupBox1.SuspendLayout();
             this.groupBox2.SuspendLayout();
             this.grpAutomatic.SuspendLayout();
@@ -230,7 +232,9 @@
             // 
             // groupBox2
             // 
-            this.groupBox2.Controls.Add(this.chkClean);
+            this.groupBox2.Controls.Add(this.chkVs);
+            this.groupBox2.Controls.Add(this.chkBin);
+            this.groupBox2.Controls.Add(this.chkObj);
             this.groupBox2.Controls.Add(this.chkAutomatic);
             this.groupBox2.Controls.Add(this.chkTime);
             this.groupBox2.Controls.Add(this.txtName);
@@ -249,6 +253,17 @@
             this.groupBox2.Size = new System.Drawing.Size(530, 426);
             this.groupBox2.TabIndex = 18;
             this.groupBox2.TabStop = false;
+            // 
+            // chkObj
+            // 
+            this.chkObj.AutoSize = true;
+            this.chkObj.Location = new System.Drawing.Point(230, 252);
+            this.chkObj.Name = "chkObj";
+            this.chkObj.RightToLeft = System.Windows.Forms.RightToLeft.Yes;
+            this.chkObj.Size = new System.Drawing.Size(69, 38);
+            this.chkObj.TabIndex = 16;
+            this.chkObj.Text = "obj";
+            this.chkObj.UseVisualStyleBackColor = true;
             // 
             // chkAutomatic
             // 
@@ -351,16 +366,27 @@
             this.label3.TabIndex = 16;
             this.label3.Text = "مدت زمان تا بک آپ بعدی :";
             // 
-            // chkClean
+            // chkBin
             // 
-            this.chkClean.AutoSize = true;
-            this.chkClean.Location = new System.Drawing.Point(230, 252);
-            this.chkClean.Name = "chkClean";
-            this.chkClean.RightToLeft = System.Windows.Forms.RightToLeft.Yes;
-            this.chkClean.Size = new System.Drawing.Size(192, 38);
-            this.chkClean.TabIndex = 16;
-            this.chkClean.Text = "پاک کردن bin و obj";
-            this.chkClean.UseVisualStyleBackColor = true;
+            this.chkBin.AutoSize = true;
+            this.chkBin.Location = new System.Drawing.Point(308, 252);
+            this.chkBin.Name = "chkBin";
+            this.chkBin.RightToLeft = System.Windows.Forms.RightToLeft.Yes;
+            this.chkBin.Size = new System.Drawing.Size(69, 38);
+            this.chkBin.TabIndex = 17;
+            this.chkBin.Text = "bin";
+            this.chkBin.UseVisualStyleBackColor = true;
+            // 
+            // chkVs
+            // 
+            this.chkVs.AutoSize = true;
+            this.chkVs.Location = new System.Drawing.Point(383, 252);
+            this.chkVs.Name = "chkVs";
+            this.chkVs.RightToLeft = System.Windows.Forms.RightToLeft.Yes;
+            this.chkVs.Size = new System.Drawing.Size(64, 38);
+            this.chkVs.TabIndex = 18;
+            this.chkVs.Text = "Vs";
+            this.chkVs.UseVisualStyleBackColor = true;
             // 
             // Form1
             // 
@@ -415,7 +441,9 @@
         private System.Windows.Forms.Button btnStop;
         private System.Windows.Forms.Button btnAddFolder;
         private System.Windows.Forms.RichTextBox richTextSelect;
-        private System.Windows.Forms.CheckBox chkClean;
+        private System.Windows.Forms.CheckBox chkObj;
+        private System.Windows.Forms.CheckBox chkVs;
+        private System.Windows.Forms.CheckBox chkBin;
     }
 }
 

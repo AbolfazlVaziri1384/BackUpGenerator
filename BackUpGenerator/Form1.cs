@@ -55,13 +55,13 @@ namespace BackUpGenerator
                     MessageBox.Show("لطفاً حداقل یک فایل برای پشتیبان‌گیری انتخاب کنید", "خطا", MessageBoxButtons.OK, MessageBoxIcon.Error);
                     return;
                 }
-                if (chkAutomatic.Checked && chkClean.Checked)
+                if (chkAutomatic.Checked && chkObj.Checked)
                 {
                     MessageBox.Show("حواستان باشد که هنگام استفاده از پروژه به مشکل برنخورید چون هر دو گزینه پاک کردن و اتوماتیک فعال است", "هشدار", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 }
-                if (chkClean.Checked)
+                if (chkBin.Checked || chkObj.Checked || chkVs.Checked)
                 {
-                    CleanBinObjFolders();
+                    CleanSelectedFolders();
                 }
                 // ساخت نام فایل
                 string fileName = txtName.Text;
@@ -292,6 +292,8 @@ namespace BackUpGenerator
             }
         }
 
+
+
         // متد برای تبدیل مسیر طولانی به مسیر کوتاه (8.3)
         private string GetShortPath(string longPath)
         {
@@ -489,36 +491,58 @@ namespace BackUpGenerator
                 MessageBox.Show($"خطا در خواندن پوشه {directoryPath}:\n{ex.Message}", "خطا", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             }
         }
-        private void CleanBinObjFolders()
+        private void CleanSelectedFolders()
         {
             try
             {
+                // ساخت متن هشدار بر اساس انتخاب‌ها
+                var selectedTargets = new List<string>();
+                if (chkBin.Checked) selectedTargets.Add("bin");
+                if (chkObj.Checked) selectedTargets.Add("obj");
+                if (chkVs.Checked) selectedTargets.Add(".vs");
+
+                if (selectedTargets.Count > 0)
+                {
+                    string targets = string.Join(" , ", selectedTargets);
+                    MessageBox.Show(
+                        $"توجه: شما انتخاب کرده‌اید پوشه‌های زیر حذف شوند:\n{targets}\n\nلطفاً مطمئن شوید که در حال استفاده از پروژه مشکلی ایجاد نمی‌شود.",
+                        "هشدار",
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Warning
+                    );
+                }
+
+                // شروع پاکسازی
                 foreach (var path in selectedFiles)
                 {
                     if (Directory.Exists(path))
                     {
-                        // پاکسازی پوشه‌های bin و obj در مسیرهای انتخاب شده
-                        CleanDirectory(path, "bin");
-                        CleanDirectory(path, "obj");
+                        if (chkBin.Checked) CleanDirectory(path, "bin");
+                        if (chkObj.Checked) CleanDirectory(path, "obj");
+                        if (chkVs.Checked) CleanDirectory(path, ".vs");
                     }
                     else if (File.Exists(path))
                     {
-                        // اگر فایل انتخاب شده است، پوشه والد آن را بررسی می‌کنیم
                         string parentDir = Path.GetDirectoryName(path);
                         if (Directory.Exists(parentDir))
                         {
-                            CleanDirectory(parentDir, "bin");
-                            CleanDirectory(parentDir, "obj");
+                            if (chkBin.Checked) CleanDirectory(parentDir, "bin");
+                            if (chkObj.Checked) CleanDirectory(parentDir, "obj");
+                            if (chkVs.Checked) CleanDirectory(parentDir, ".vs");
                         }
                     }
                 }
-                MessageBox.Show("پوشه‌های bin و obj با موفقیت پاکسازی شدند.", "موفقیت", MessageBoxButtons.OK, MessageBoxIcon.Information);
+
+                MessageBox.Show("پوشه‌های انتخابی با موفقیت پاکسازی شدند.",
+                    "موفقیت", MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"خطا در پاکسازی پوشه‌های bin و obj:\n{ex.Message}", "خطا", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show($"خطا در پاکسازی پوشه‌ها:\n{ex.Message}",
+                    "خطا", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
+
 
         private void CleanDirectory(string rootDir, string folderName)
         {
